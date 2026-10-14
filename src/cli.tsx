@@ -6,35 +6,43 @@ import {captureFrames} from './lib/click-map.js'
 import {parseArgs} from './lib/args.js'
 import {readClipboard} from './lib/clipboard.js'
 import {isProbablyUrl} from './lib/platforms.js'
+import {stopServer} from './lib/server.js'
 
 // read at runtime from the shipped package.json so npm version bumps
 // can't drift from a hardcoded constant
 const VERSION: string = createRequire(import.meta.url)('../package.json').version
 
 const HELP = `
-  yoinks — yoink any video. paste. yoink. done.
+  yoinks-Leech — yoink any video. paste. yoink. done.
 
   Usage
+    $ yoinks-leech [url]
     $ yoinks [url]
 
   Examples
-    $ yoinks https://youtu.be/dQw4w9WgXcQ
-    $ yoinks https://x.com/user/status/123456
-    $ yoinks                 (prompts for a url)
+    $ yoinks-leech https://youtu.be/dQw4w9WgXcQ
+    $ yoinks-leech https://x.com/user/status/123456
+    $ yoinks-leech                 (prompts for a url)
 
   Options
     --theme <mode>  use auto, light, or dark for this run
+    -p, --port      port for the embedded masked download server (default: 4321)
     -h, --help      show this help
     -v, --version   show version
 
+  Features
+    • Download videos from YouTube, X, Instagram, Threads, TikTok & 1800+ sites.
+    • Built-in Session History with direct masked downloads.
+    • Ephemeral files with 72-hour auto-expiration.
+    • Embedded protected HTTP server (hides server paths & internal addresses).
+
   Downloads are saved to ~/Downloads.
-  Powered by yt-dlp — YouTube, X, Instagram, Threads, TikTok & 1800+ sites.
 `
 
 const args = parseArgs(process.argv.slice(2))
 
 if (args.error) {
-  console.error(`yoinks: ${args.error}\nTry “yoinks --help” for usage.`)
+  console.error(`yoinks-Leech: ${args.error}\nTry “yoinks-leech --help” for usage.`)
   process.exit(1)
 }
 
@@ -66,13 +74,17 @@ const leaveAltScreen = () => process.stdout.write('\x1b[?1006l\x1b[?1000l\x1b[?1
 
 if (isTTY) {
   enterAltScreen()
-  process.on('exit', leaveAltScreen)
+  process.on('exit', () => {
+    leaveAltScreen()
+    void stopServer()
+  })
   // restore the terminal BEFORE a crash prints, or the stack trace is
   // wiped along with the alternate screen and the app looks like it
   // silently quit
   for (const event of ['uncaughtException', 'unhandledRejection'] as const) {
     process.on(event, (error: unknown) => {
       leaveAltScreen()
+      void stopServer()
       console.error(error)
       process.exit(1)
     })
@@ -85,6 +97,7 @@ const {waitUntilExit} = render(
     initialUrl={initialUrl}
     clipboardUrl={clipboardUrl}
     initialThemeMode={initialThemeMode}
+    port={args.port}
     onOutcome={result => (outcome = result)}
   />,
   // keep a copy of every frame so clicks can be hit-tested against it
@@ -94,6 +107,8 @@ const {waitUntilExit} = render(
 await waitUntilExit()
 
 if (isTTY) leaveAltScreen()
+await stopServer()
+
 if (outcome.filepath) {
   console.log(`✓ yoinked → ${outcome.filepath}`)
 }

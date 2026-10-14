@@ -1,11 +1,11 @@
-# yoinks
+# yoinks-Leech
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-  <img src="assets/logo-light.svg" alt="yoinks" width="288">
+  <img src="assets/logo-light.svg" alt="yoinks-Leech" width="288">
 </picture>
 
-yoink any video. paste. yoink. done.
+yoinks-Leech — yoink any video. paste. yoink. done.
 
 Download videos from YouTube, X/Twitter, Instagram, Threads, TikTok and
 1,800+ other sites — right from your terminal. Paste a url, pick a

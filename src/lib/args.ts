@@ -5,6 +5,7 @@ export type CliArgs = {
   version: boolean
   initialUrl?: string
   themeMode?: ThemeMode
+  port?: number
   error?: string
 }
 
@@ -27,6 +28,20 @@ export function parseArgs(args: string[]): CliArgs {
       const value = arg.slice('--theme='.length)
       if (!isThemeMode(value)) return {...result, error: `unknown theme “${value}” — use auto, light, or dark`}
       result.themeMode = value
+    } else if (arg === '-p' || arg === '--port') {
+      const value = args[++index]
+      const portNum = Number(value)
+      if (!value || isNaN(portNum) || portNum < 1 || portNum > 65535) {
+        return {...result, error: '--port needs a valid port number (1-65535)'}
+      }
+      result.port = portNum
+    } else if (arg.startsWith('--port=')) {
+      const value = arg.slice('--port='.length)
+      const portNum = Number(value)
+      if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+        return {...result, error: '--port needs a valid port number (1-65535)'}
+      }
+      result.port = portNum
     } else if (arg.startsWith('-')) {
       return {...result, error: `unknown option “${arg}”`}
     } else {

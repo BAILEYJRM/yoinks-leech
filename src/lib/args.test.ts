@@ -21,9 +21,26 @@ test('parses an equals-style theme option after the url', () => {
   })
 })
 
+test('parses custom port options', () => {
+  assert.deepEqual(parseArgs(['--port', '8080', 'https://example.com/video']), {
+    help: false,
+    version: false,
+    port: 8080,
+    initialUrl: 'https://example.com/video',
+  })
+
+  assert.deepEqual(parseArgs(['-p', '9000']), {
+    help: false,
+    version: false,
+    port: 9000,
+    initialUrl: undefined,
+  })
+})
+
 test('rejects missing, invalid, and unknown options', () => {
   assert.match(parseArgs(['--theme']).error ?? '', /needs a value/)
   assert.match(parseArgs(['--theme', 'sepia']).error ?? '', /unknown theme/)
+  assert.match(parseArgs(['--port', 'not-a-port']).error ?? '', /valid port number/)
   assert.match(parseArgs(['--wat']).error ?? '', /unknown option/)
   assert.match(parseArgs(['one', 'two']).error ?? '', /single url/)
 })

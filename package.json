@@ -1,9 +1,10 @@
 {
-  "name": "yoinks",
+  "name": "yoinks-leech",
   "version": "0.3.1",
-  "description": "yoink any video from YouTube, X, Instagram, Threads & 1800+ sites — right from your terminal. paste. yoink. done.",
+  "description": "yoinks-Leech — yoink any video from YouTube, X, Instagram, Threads & 1800+ sites with masked downloads and ephemeral sessions.",
   "type": "module",
   "bin": {
+    "yoinks-leech": "dist/cli.js",
     "yoinks": "dist/cli.js"
   },
   "files": [
