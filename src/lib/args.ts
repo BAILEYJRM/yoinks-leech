@@ -3,14 +3,17 @@ import {isThemeMode, type ThemeMode} from '../theme.js'
 export type CliArgs = {
   help: boolean
   version: boolean
+  serve: boolean
   initialUrl?: string
   themeMode?: ThemeMode
   port?: number
+  host?: string
+  publicUrl?: string
   error?: string
 }
 
 export function parseArgs(args: string[]): CliArgs {
-  const result: CliArgs = {help: false, version: false}
+  const result: CliArgs = {help: false, version: false, serve: false}
   const positional: string[] = []
 
   for (let index = 0; index < args.length; index++) {
@@ -19,6 +22,8 @@ export function parseArgs(args: string[]): CliArgs {
       result.help = true
     } else if (arg === '-v' || arg === '--version') {
       result.version = true
+    } else if (arg === '-s' || arg === '--serve' || arg === 'serve') {
+      result.serve = true
     } else if (arg === '--theme') {
       const value = args[++index]
       if (!value) return {...result, error: '--theme needs a value: auto, light, or dark'}
@@ -42,6 +47,22 @@ export function parseArgs(args: string[]): CliArgs {
         return {...result, error: '--port needs a valid port number (1-65535)'}
       }
       result.port = portNum
+    } else if (arg === '--host') {
+      const value = args[++index]
+      if (!value) return {...result, error: '--host needs a host address (e.g. 0.0.0.0)'}
+      result.host = value
+    } else if (arg.startsWith('--host=')) {
+      const value = arg.slice('--host='.length)
+      if (!value) return {...result, error: '--host needs a host address (e.g. 0.0.0.0)'}
+      result.host = value
+    } else if (arg === '--public-url') {
+      const value = args[++index]
+      if (!value) return {...result, error: '--public-url needs a valid URL'}
+      result.publicUrl = value
+    } else if (arg.startsWith('--public-url=')) {
+      const value = arg.slice('--public-url='.length)
+      if (!value) return {...result, error: '--public-url needs a valid URL'}
+      result.publicUrl = value
     } else if (arg.startsWith('-')) {
       return {...result, error: `unknown option “${arg}”`}
     } else {

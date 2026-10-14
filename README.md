@@ -45,10 +45,15 @@ Requires Node 18+. Everything else (yt-dlp, ffmpeg) is fetched or bundled automa
 ## Usage
 
 ```sh
-$ yoinks-leech https://youtu.be/dQw4w9WgXcQ    # straight to the format picker
+# Terminal interactive mode
+$ yoinks-leech https://youtu.be/dQw4w9WgXcQ    # straight to format picker
 $ yoinks-leech                                 # interactive prompt for a url
 $ yoinks-leech --theme light                   # force light palette (auto, light, dark)
 $ yoinks-leech --port 8080                     # set custom port for the masked download server
+
+# Dedicated background download server (for Docker / multi-user servers)
+$ yoinks-leech --serve --host 0.0.0.0 --port 4321
+$ yoinks-leech --serve --public-url https://downloads.dominio.com
 ```
 
 *(Note: the command `yoinks` is also available as an alias).*
@@ -56,6 +61,31 @@ $ yoinks-leech --port 8080                     # set custom port for the masked 
 yoinks takes over the terminal (full-screen, centered — and restores your scrollback on exit). Pick a format with ↑/↓ (or j/k, or number keys) and hit enter. `esc` goes back, `^c` quits. Or just use the mouse — the yoink button, the format list and the footer hints are all clickable, and clicking the logo takes you back home. Files are saved to `~/Downloads`, and masked local streaming URLs are served automatically.
 
 The default `auto` theme uses your terminal's own foreground and background, so it follows light and dark terminal themes without guessing. Press `^t` or click the theme control in the footer to cycle through `auto`, `light`, and `dark` for the current session. Use `--theme auto`, `--theme light`, or `--theme dark` to choose the starting theme for one launch.
+
+## Multi-User Docker & Cloudflare Tunnel Architecture
+
+When deploying inside a Docker container with `ttyd` for web-based terminal access, run the download server as a dedicated daemon on `0.0.0.0:4321` so multiple users share a single backend behind Cloudflare:
+
+```text
+Cloudflare
+   │
+   ├── yoinks.dominio.com  ──> :7681 (ttyd) ──> yoinks-leech TUI sessions
+   │
+   └── downloads.dominio.com ──> :4321 ──> yoinks-leech --serve (shared backend)
+```
+
+1. **Start the persistent download daemon** in your container entrypoint:
+   ```sh
+   yoinks-leech --serve --host 0.0.0.0 --port 4321 --public-url https://downloads.dominio.com
+   ```
+   *(Or via environment variables: `HOST=0.0.0.0`, `PORT=4321`, `PUBLIC_DOWNLOAD_URL=https://downloads.dominio.com`)*
+
+2. **Serve interactive TUI sessions** via `ttyd`:
+   ```sh
+   ttyd -p 7681 -W yoinks-leech
+   ```
+
+Each `ttyd` session will automatically connect to the shared server on `:4321` without opening random ephemeral ports or terminating the server on session exit. Masked download links generated in the TUI will seamlessly use your configured public domain.
 
 <img src="assets/download-options.png" alt="yoinks format picker — resolutions with estimated file sizes, plus audio-only mp3" width="100%">
 

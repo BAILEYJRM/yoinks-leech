@@ -61,7 +61,38 @@ test('embedded masked download server serves files with token security and sessi
     const otherData = await apiResOther.json() as {records: Array<{id: string}>}
     assert.equal(otherData.records.some(r => r.id === record.id), false)
   } finally {
-    await stopServer()
+    await stopServer(true)
     if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile)
   }
 })
+
+test('public base URL configures masked download URLs for external domains', async () => {
+  const {setPublicBaseUrl} = await import('./server.js')
+  setPublicBaseUrl('https://downloads.example.com')
+  const testUrl = getMaskedDownloadUrl('abc123token')
+  assert.equal(testUrl, 'https://downloads.example.com/d/abc123token')
+  setPublicBaseUrl(undefined)
+})
+
+test('isServerRunning detects active server and secondary startServer reuses it without closing', async () => {
+  const {isServerRunning} = await import('./server.js')
+  const first = await startServer(0)
+  const port = first.port
+
+  try {
+    const running = await isServerRunning(port, '127.0.0.1')
+    assert.equal(running, true)
+
+    // Secondary session adopts existing server
+    const second = await startServer(port, '127.0.0.1')
+    assert.equal(second.port, port)
+
+    // Secondary session exits and calls close() — server must remain running
+    await second.close()
+    const stillRunning = await isServerRunning(port, '127.0.0.1')
+    assert.equal(stillRunning, true)
+  } finally {
+    await stopServer(true)
+  }
+})
+

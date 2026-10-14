@@ -6,7 +6,7 @@ import {captureFrames} from './lib/click-map.js'
 import {parseArgs} from './lib/args.js'
 import {readClipboard} from './lib/clipboard.js'
 import {isProbablyUrl} from './lib/platforms.js'
-import {stopServer} from './lib/server.js'
+import {runStandaloneServer, setPublicBaseUrl, stopServer} from './lib/server.js'
 
 // read at runtime from the shipped package.json so npm version bumps
 // can't drift from a hardcoded constant
@@ -17,24 +17,29 @@ const HELP = `
 
   Usage
     $ yoinks-leech [url]
+    $ yoinks-leech --serve [options]
     $ yoinks [url]
 
   Examples
     $ yoinks-leech https://youtu.be/dQw4w9WgXcQ
-    $ yoinks-leech https://x.com/user/status/123456
+    $ yoinks-leech --serve --port 4321 --host 0.0.0.0
     $ yoinks-leech                 (prompts for a url)
 
   Options
-    --theme <mode>  use auto, light, or dark for this run
-    -p, --port      port for the embedded masked download server (default: 4321)
-    -h, --help      show this help
-    -v, --version   show version
+    --theme <mode>      use auto, light, or dark for this run
+    -s, --serve         run the dedicated masked download server daemon
+    -p, --port <port>   port for the download server (default: 4321)
+    --host <host>       host to bind the download server (default: 0.0.0.0)
+    --public-url <url>  public download base URL (e.g. https://downloads.dominio.com)
+    -h, --help          show this help
+    -v, --version       show version
 
   Features
     • Download videos from YouTube, X, Instagram, Threads, TikTok & 1800+ sites.
     • Built-in Session History with direct masked downloads.
     • Ephemeral files with 72-hour auto-expiration.
     • Embedded protected HTTP server (hides server paths & internal addresses).
+    • Decoupled server mode for multi-user Docker & Cloudflare Tunnel deployments.
 
   Downloads are saved to ~/Downloads.
 `
@@ -54,6 +59,19 @@ if (args.help) {
 if (args.version) {
   console.log(VERSION)
   process.exit(0)
+}
+
+if (args.serve) {
+  await runStandaloneServer({
+    port: args.port,
+    host: args.host,
+    publicUrl: args.publicUrl,
+  })
+  process.exit(0)
+}
+
+if (args.publicUrl) {
+  setPublicBaseUrl(args.publicUrl)
 }
 
 const initialUrl = args.initialUrl
@@ -98,6 +116,8 @@ const {waitUntilExit} = render(
     clipboardUrl={clipboardUrl}
     initialThemeMode={initialThemeMode}
     port={args.port}
+    host={args.host}
+    publicUrl={args.publicUrl}
     onOutcome={result => (outcome = result)}
   />,
   // keep a copy of every frame so clicks can be hit-tested against it

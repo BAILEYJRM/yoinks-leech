@@ -38,7 +38,7 @@ import {
 } from './lib/history.js'
 import {openInBrowser} from './lib/open.js'
 import {detectPlatform, isProbablyUrl, type Platform} from './lib/platforms.js'
-import {getMaskedDownloadUrl, startServer} from './lib/server.js'
+import {getMaskedDownloadUrl, setPublicBaseUrl, startServer} from './lib/server.js'
 import {useMouseClick} from './lib/use-mouse-click.js'
 import {nextThemeMode, ThemeProvider, type ThemeMode, useTheme} from './theme.js'
 import {
@@ -165,6 +165,8 @@ type AppProps = {
   clipboardUrl?: string
   initialThemeMode?: ThemeMode
   port?: number
+  host?: string
+  publicUrl?: string
   sessionId?: string
   onOutcome: (outcome: Outcome) => void
 }
@@ -186,6 +188,8 @@ function AppContent({
   initialUrl,
   clipboardUrl,
   port,
+  host,
+  publicUrl,
   sessionId: customSessionId,
   onOutcome,
   cycleTheme,
@@ -193,6 +197,8 @@ function AppContent({
   initialUrl?: string
   clipboardUrl?: string
   port?: number
+  host?: string
+  publicUrl?: string
   sessionId?: string
   onOutcome: (outcome: Outcome) => void
   cycleTheme: () => void
@@ -216,10 +222,11 @@ function AppContent({
   const abortRef = useRef<AbortController | undefined>(undefined)
   const [phase, setPhase] = useState<Phase>(initialUrl ? {name: 'probing', status: 'warming up…'} : {name: 'input'})
 
-  // Auto-start embedded masked download server
+  // Auto-start embedded masked download server or adopt existing shared daemon
   useEffect(() => {
-    void startServer(port ?? 4321)
-  }, [port])
+    if (publicUrl) setPublicBaseUrl(publicUrl)
+    void startServer(port ?? 4321, host ?? process.env.HOST ?? '0.0.0.0')
+  }, [port, host, publicUrl])
 
   const columns = stdout?.columns && stdout.columns > 0 ? stdout.columns : 80
   const boxWidth = Math.max(14, Math.min(64, columns - 6))

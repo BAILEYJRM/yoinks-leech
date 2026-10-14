@@ -7,6 +7,7 @@ test('parses a url and a spaced theme option without confusing the value for the
   assert.deepEqual(parseArgs(['--theme', 'light', 'https://example.com/video']), {
     help: false,
     version: false,
+    serve: false,
     themeMode: 'light',
     initialUrl: 'https://example.com/video',
   })
@@ -16,6 +17,7 @@ test('parses an equals-style theme option after the url', () => {
   assert.deepEqual(parseArgs(['https://example.com/video', '--theme=dark']), {
     help: false,
     version: false,
+    serve: false,
     themeMode: 'dark',
     initialUrl: 'https://example.com/video',
   })
@@ -25,6 +27,7 @@ test('parses custom port options', () => {
   assert.deepEqual(parseArgs(['--port', '8080', 'https://example.com/video']), {
     help: false,
     version: false,
+    serve: false,
     port: 8080,
     initialUrl: 'https://example.com/video',
   })
@@ -32,7 +35,28 @@ test('parses custom port options', () => {
   assert.deepEqual(parseArgs(['-p', '9000']), {
     help: false,
     version: false,
+    serve: false,
     port: 9000,
+    initialUrl: undefined,
+  })
+})
+
+test('parses serve, host, and public-url options', () => {
+  assert.deepEqual(parseArgs(['--serve', '--host', '0.0.0.0', '--public-url', 'https://downloads.example.com']), {
+    help: false,
+    version: false,
+    serve: true,
+    host: '0.0.0.0',
+    publicUrl: 'https://downloads.example.com',
+    initialUrl: undefined,
+  })
+
+  assert.deepEqual(parseArgs(['-s', '--host=127.0.0.1', '--public-url=https://dl.example.com']), {
+    help: false,
+    version: false,
+    serve: true,
+    host: '127.0.0.1',
+    publicUrl: 'https://dl.example.com',
     initialUrl: undefined,
   })
 })
