@@ -36,7 +36,7 @@ import {
   saveDownloadRecord,
   type HistoryRecord,
 } from './lib/history.js'
-import {openInBrowser} from './lib/open.js'
+import {openInBrowser, terminalHyperlink} from './lib/open.js'
 import {detectPlatform, isProbablyUrl, type Platform} from './lib/platforms.js'
 import {getMaskedDownloadUrl, setPublicBaseUrl, startServer} from './lib/server.js'
 import {useMouseClick} from './lib/use-mouse-click.js'
@@ -116,7 +116,7 @@ type Phase =
       refreshing?: boolean
     }
   | {name: 'done'; filepath: string; maskedToken?: string; copied?: boolean}
-  | {name: 'history'; selectedIndex: number; copied?: boolean; notice?: string}
+  | {name: 'history'; selectedIndex: number; copied?: boolean; notice?: string; activeDownloadUrl?: string}
   | {name: 'error'; message: string}
 
 const HINTS: Record<Phase['name'], Array<[string, string]>> = {
@@ -280,11 +280,13 @@ function AppContent({
 
   const handleDownloadByRecord = useCallback((record: HistoryRecord) => {
     if (record.fileExists === false) {
-      setPhase(p => (p.name === 'history' ? {...p, notice: `✗ File "${record.filename}" is no longer on disk.`} : p))
+      setPhase(p => (p.name === 'history' ? {...p, notice: `✗ File "${record.filename}" is no longer on disk.`, activeDownloadUrl: undefined} : p))
       return
     }
     const downloadUrl = getMaskedDownloadUrl(record.maskedToken)
     openInBrowser(downloadUrl)
+    writeClipboard(downloadUrl)
+    setPhase(p => (p.name === 'history' ? {...p, activeDownloadUrl: downloadUrl, copied: true, notice: undefined} : p))
   }, [])
 
   useInput(
@@ -301,13 +303,13 @@ function AppContent({
         const currentPage = Math.floor(phase.selectedIndex / PAGE_SIZE)
 
         if (key.upArrow) {
-          setPhase(p => (p.name === 'history' ? {...p, selectedIndex: Math.max(0, p.selectedIndex - 1), copied: false, notice: undefined} : p))
+          setPhase(p => (p.name === 'history' ? {...p, selectedIndex: Math.max(0, p.selectedIndex - 1), copied: false, notice: undefined, activeDownloadUrl: undefined} : p))
           return
         }
         if (key.downArrow) {
           setPhase(p =>
             p.name === 'history'
-              ? {...p, selectedIndex: Math.min(Math.max(0, historyRecords.length - 1), p.selectedIndex + 1), copied: false, notice: undefined}
+              ? {...p, selectedIndex: Math.min(Math.max(0, historyRecords.length - 1), p.selectedIndex + 1), copied: false, notice: undefined, activeDownloadUrl: undefined}
               : p,
           )
           return
@@ -315,13 +317,13 @@ function AppContent({
         // Left arrow / Previous page
         if (key.leftArrow) {
           const prevPage = Math.max(0, currentPage - 1)
-          setPhase(p => (p.name === 'history' ? {...p, selectedIndex: prevPage * PAGE_SIZE, copied: false, notice: undefined} : p))
+          setPhase(p => (p.name === 'history' ? {...p, selectedIndex: prevPage * PAGE_SIZE, copied: false, notice: undefined, activeDownloadUrl: undefined} : p))
           return
         }
         // Right arrow / Next page
         if (key.rightArrow) {
           const nextPage = Math.min(totalPages - 1, currentPage + 1)
-          setPhase(p => (p.name === 'history' ? {...p, selectedIndex: nextPage * PAGE_SIZE, copied: false, notice: undefined} : p))
+          setPhase(p => (p.name === 'history' ? {...p, selectedIndex: nextPage * PAGE_SIZE, copied: false, notice: undefined, activeDownloadUrl: undefined} : p))
           return
         }
         if (key.return) {
@@ -332,15 +334,16 @@ function AppContent({
         if (input.toLowerCase() === 'c') {
           const selected = historyRecords[phase.selectedIndex]
           if (selected) {
-            writeClipboard(getMaskedDownloadUrl(selected.maskedToken))
-            setPhase(p => (p.name === 'history' ? {...p, copied: true, notice: undefined} : p))
+            const downloadUrl = getMaskedDownloadUrl(selected.maskedToken)
+            writeClipboard(downloadUrl)
+            setPhase(p => (p.name === 'history' ? {...p, copied: true, notice: undefined, activeDownloadUrl: downloadUrl} : p))
           }
           return
         }
         if (input.toLowerCase() === 'x') {
           const cleaned = cleanMissingRecords(sessionIdRef.current)
           setHistoryRecords(cleaned)
-          setPhase(p => (p.name === 'history' ? {...p, selectedIndex: 0, notice: '✓ Cleaned up missing files.'} : p))
+          setPhase(p => (p.name === 'history' ? {...p, selectedIndex: 0, notice: '✓ Cleaned up missing files.', activeDownloadUrl: undefined} : p))
           return
         }
         if (key.escape) {
@@ -360,11 +363,15 @@ function AppContent({
       // Done screen shortcuts
       if (phase.name === 'done') {
         if (input.toLowerCase() === 'o' && phase.maskedToken) {
-          openInBrowser(getMaskedDownloadUrl(phase.maskedToken))
+          const downloadUrl = getMaskedDownloadUrl(phase.maskedToken)
+          openInBrowser(downloadUrl)
+          writeClipboard(downloadUrl)
+          setPhase(p => (p.name === 'done' ? {...p, copied: true} : p))
           return
         }
         if (input.toLowerCase() === 'c' && phase.maskedToken) {
-          writeClipboard(getMaskedDownloadUrl(phase.maskedToken))
+          const downloadUrl = getMaskedDownloadUrl(phase.maskedToken)
+          writeClipboard(downloadUrl)
           setPhase(p => (p.name === 'done' ? {...p, copied: true} : p))
           return
         }
@@ -477,23 +484,29 @@ function AppContent({
         const totalPages = Math.ceil(totalItems / PAGE_SIZE) || 1
         const currentPage = Math.floor(phase.selectedIndex / PAGE_SIZE)
         const nextPage = (currentPage + 1) % totalPages
-        setPhase(p => (p.name === 'history' ? {...p, selectedIndex: nextPage * PAGE_SIZE, copied: false, notice: undefined} : p))
+        setPhase(p => (p.name === 'history' ? {...p, selectedIndex: nextPage * PAGE_SIZE, copied: false, notice: undefined, activeDownloadUrl: undefined} : p))
       }
     }
     if (key === 'x' && phase.name === 'history') {
       return () => {
         const cleaned = cleanMissingRecords(sessionIdRef.current)
         setHistoryRecords(cleaned)
-        setPhase(p => (p.name === 'history' ? {...p, selectedIndex: 0, notice: '✓ Cleaned up missing files.'} : p))
+        setPhase(p => (p.name === 'history' ? {...p, selectedIndex: 0, notice: '✓ Cleaned up missing files.', activeDownloadUrl: undefined} : p))
       }
     }
     if (key === 'o' && phase.name === 'done' && phase.maskedToken) {
-      return () => openInBrowser(getMaskedDownloadUrl(phase.maskedToken!))
+      return () => {
+        const maskedUrl = getMaskedDownloadUrl(phase.maskedToken!)
+        openInBrowser(maskedUrl)
+        writeClipboard(maskedUrl)
+        setPhase(p => (p.name === 'done' ? {...p, copied: true} : p))
+      }
     }
     if (key === 'c') {
       if (phase.name === 'done' && phase.maskedToken) {
         return () => {
-          writeClipboard(getMaskedDownloadUrl(phase.maskedToken!))
+          const maskedUrl = getMaskedDownloadUrl(phase.maskedToken!)
+          writeClipboard(maskedUrl)
           setPhase(p => (p.name === 'done' ? {...p, copied: true} : p))
         }
       }
@@ -501,8 +514,9 @@ function AppContent({
         return () => {
           const selected = historyRecords[phase.selectedIndex]
           if (selected) {
-            writeClipboard(getMaskedDownloadUrl(selected.maskedToken))
-            setPhase(p => (p.name === 'history' ? {...p, copied: true, notice: undefined} : p))
+            const maskedUrl = getMaskedDownloadUrl(selected.maskedToken)
+            writeClipboard(maskedUrl)
+            setPhase(p => (p.name === 'history' ? {...p, copied: true, notice: undefined, activeDownloadUrl: maskedUrl} : p))
           }
         }
       }
@@ -532,8 +546,22 @@ function AppContent({
     clickTargets.push({match: DONE_LABEL, padX: 4, padY: 1, action: resetToInput})
     if (phase.maskedToken) {
       const maskedUrl = getMaskedDownloadUrl(phase.maskedToken)
-      clickTargets.push({match: maskedUrl, action: () => openInBrowser(maskedUrl)})
-      clickTargets.push({match: 'download via link', action: () => openInBrowser(maskedUrl)})
+      clickTargets.push({
+        match: maskedUrl,
+        action: () => {
+          openInBrowser(maskedUrl)
+          writeClipboard(maskedUrl)
+          setPhase(p => (p.name === 'done' ? {...p, copied: true} : p))
+        },
+      })
+      clickTargets.push({
+        match: 'download via link',
+        action: () => {
+          openInBrowser(maskedUrl)
+          writeClipboard(maskedUrl)
+          setPhase(p => (p.name === 'done' ? {...p, copied: true} : p))
+        },
+      })
       clickTargets.push({
         match: 'copy link',
         action: () => {
@@ -562,6 +590,25 @@ function AppContent({
         action: () => {
           setPhase(p => (p.name === 'history' ? {...p, selectedIndex: actualIndex, notice: undefined} : p))
           handleDownloadByRecord(record)
+        },
+      })
+      if (record.fileExists !== false) {
+        clickTargets.push({
+          match: '[⬇ dl]',
+          action: () => {
+            setPhase(p => (p.name === 'history' ? {...p, selectedIndex: actualIndex, notice: undefined} : p))
+            handleDownloadByRecord(record)
+          },
+        })
+      }
+    }
+
+    if (phase.activeDownloadUrl) {
+      clickTargets.push({
+        match: phase.activeDownloadUrl,
+        action: () => {
+          openInBrowser(phase.activeDownloadUrl!)
+          writeClipboard(phase.activeDownloadUrl!)
         },
       })
     }
@@ -676,7 +723,9 @@ function AppContent({
                               {metaParts}  
                             </Text>
                             <Text color={isMissing ? theme.gray : theme.primary} dimColor={isMissing} bold={isSelected}>
-                              {isMissing ? '[missing]' : '[⬇ dl]'}
+                              {isMissing
+                                ? '[missing]'
+                                : terminalHyperlink(getMaskedDownloadUrl(record.maskedToken), '[⬇ dl]')}
                             </Text>
                           </Box>
                         </Box>
@@ -691,6 +740,18 @@ function AppContent({
           {phase.notice ? (
             <Box marginTop={0}>
               <Text color={theme.primary} bold>{phase.notice}</Text>
+            </Box>
+          ) : phase.activeDownloadUrl ? (
+            <Box marginTop={0} flexDirection="column" alignItems="center">
+              <Text>
+                <Text color={theme.primary} bold>⬇ Download: </Text>
+                <Text color={theme.primary} underline>
+                  {terminalHyperlink(phase.activeDownloadUrl, phase.activeDownloadUrl)}
+                </Text>
+              </Text>
+              <Text color={theme.gray} dimColor={theme.dimSecondary}>
+                ✓ Link copied to clipboard · Click link above or paste in browser
+              </Text>
             </Box>
           ) : phase.copied ? (
             <Box marginTop={0}>
@@ -810,7 +871,9 @@ function AppContent({
               <Gap lines={1} />
               <Box flexDirection="column" alignItems="center">
                 <Text color={theme.gray} dimColor={theme.dimSecondary}>Masked Direct Download (72h Ephemeral):</Text>
-                <Text color={theme.primary} bold>{getMaskedDownloadUrl(phase.maskedToken)}</Text>
+                <Text color={theme.primary} bold>
+                  {terminalHyperlink(getMaskedDownloadUrl(phase.maskedToken), getMaskedDownloadUrl(phase.maskedToken))}
+                </Text>
                 {phase.copied ? (
                   <Text color={theme.primary}>✓ Link copied to clipboard!</Text>
                 ) : null}
